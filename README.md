@@ -17,4 +17,8 @@ Pull in the dependencies: install Django and Django REST framework by running:
 
 `pip install django djangorestframework`
 
+Launch the migration of the models in the database:
+
+`python manage.py makemigrations androidPackageManager && python manage.py migrate`
+
 When the installation ends you’re ready to run the server.
