@@ -5,6 +5,7 @@ import uuid
 # Django
 from django.conf import settings
 from django.core.files.storage import FileSystemStorage
+from django.core.files.storage import default_storage
 
 # Rest
 from rest_framework.decorators import api_view

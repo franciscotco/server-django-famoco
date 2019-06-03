@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from androirPackageManager.models import AndroidPackage
+from androidPackageManager.models import AndroidPackage
 
 class AndroidPkgSerializer(serializers.ModelSerializer):
    class Meta:
