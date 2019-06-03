@@ -21,10 +21,11 @@ from androidPackageManager.models import AndroidPackage
 # Constant
 package_name = "name"
 package_version_code = "versionCode"
+post_req_attr = "document"
 
-def file_upload(request):
-    save_path = os.path.join(settings.MEDIA_ROOT, 'uploads', str(request.FILES['document']))
-    path = default_storage.save(save_path, request.FILES['document'])
+def file_upload(request, my_file):
+    save_path = os.path.join(settings.MEDIA_ROOT, 'uploads', my_file.name)
+    path = default_storage.save(save_path, my_file)
     return default_storage.path(path)
 
 def decode_uploaded_file(tmp_path):
@@ -53,26 +54,33 @@ def package_already_exist(package_name, package_version_code):
 @api_view(['GET', 'POST'])
 def model_form_upload(request):
    if request.method == 'POST':
-      if request.FILES and 'document' in request.FILES:
-         tmp_path = file_upload(request)
-         myFile = request.FILES['document']
-         if not myFile.name.endswith('.apk'):
-            default_storage.delete(tmp_path)
-            return Response("Error: Wrong file extention only send apk file", status.HTTP_415_UNSUPPORTED_MEDIA_TYPE) # do stuff
+      if request.FILES and post_req_attr in request.FILES:
+         my_file = request.FILES[post_req_attr]
+
+         # Check extension file
+         if not my_file.name.endswith('.apk'):
+            return Response("Error: Wrong file extension only send apk file", status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
+
+         # Parse the file uploaded
+         tmp_path = file_upload(request, my_file)
          store = decode_uploaded_file(tmp_path)
          if not store:
             default_storage.delete(tmp_path)
-            return Response("Error: Erroned file", status.HTTP_422_UNPROCESSABLE_ENTITY) # do stuff
+            return Response("Error: Erroned file", status.HTTP_422_UNPROCESSABLE_ENTITY)
+         
          if package_already_exist(store[package_name], store[package_version_code]):
             default_storage.delete(tmp_path)
-            return Response("Error: file already exist in the database", status.HTTP_409_CONFLICT) # do stuff
-         fileName = str(uuid.uuid4()) + '.apk'
-         path = os.path.join(settings.MEDIA_ROOT, fileName)
+            return Response("Error: file information already exist in the database", status.HTTP_409_CONFLICT)
+
+         # Store the file
+         file_name = str(uuid.uuid4()) + '.apk'
+         path = os.path.join(settings.MEDIA_ROOT, file_name)
          os.rename(tmp_path, path)
-         AndroidPackage.objects.create(application="media/" + fileName, package_name=store[package_name], package_version_code=store[package_version_code])
+         AndroidPackage.objects.create(application="media/" + file_name, package_name=store[package_name], package_version_code=store[package_version_code])
+         
          return Response("Save package " + store[package_name] + " in database", status.HTTP_201_CREATED)
       else:
-         return Response("Error: Invalid form", status.HTTP_400_BAD_REQUEST) # do stuff
+         return Response("Error: Invalid form", status.HTTP_400_BAD_REQUEST)
    elif request.method == 'GET':
       app = AndroidPackage.objects.all()
       serializer = AndroidPkgSerializer(app, many=True)
