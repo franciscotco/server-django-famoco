@@ -18,10 +18,35 @@ from androidPackageManager.serializers import AndroidPkgSerializer
 # Models
 from androidPackageManager.models import AndroidPackage
 
+# Constant
+package_name = "name"
+package_version_code = "versionCode"
+
 def file_upload(request):
     save_path = os.path.join(settings.MEDIA_ROOT, 'uploads', str(request.FILES['document']))
     path = default_storage.save(save_path, request.FILES['document'])
     return default_storage.path(path)
+
+def decode_uploaded_file(tmp_path):
+   command = 'aapt dump badging ' + tmp_path + ' | grep pack'
+   my_cmd = os.popen(command).read()
+   array = my_cmd.split(' ')
+   store = {package_name: '', package_version_code: ''}
+   for cnt in range(0, len(array)):
+         tmp = array[cnt].split('=')
+         key = tmp[0]
+         if tmp and len(tmp) > 1 and key in store:
+            value = tmp[1]
+            store[key] = value.replace('\'', '')
+   if store[package_name] == '' or store[package_version_code] == '':
+      return None
+   return store
+
+def package_already_exist(package_name, package_version_code):
+   app = AndroidPackage.objects.filter(package_name=package_name, package_version_code=package_version_code)
+   if len(app) > 0:
+      return True
+   return False
 
 # Create your views here.
 
@@ -32,31 +57,23 @@ def model_form_upload(request):
          tmp_path = file_upload(request)
          myFile = request.FILES['document']
          if not myFile.name.endswith('.apk'):
-               return self.form_invalid(form)
-         command = 'aapt dump badging ' + tmp_path + ' | grep pack'
-         myCmd = os.popen(command).read()
-         array = myCmd.split(' ')
-         store = {'name': '', 'versionCode': ''}
-         for cnt in range(0, len(array)):
-               tmp = array[cnt].split('=')
-               if tmp and len(tmp) > 1 and tmp[0] in store:
-                  store[tmp[0]] = tmp[1].replace('\'', '')
-         if store['name'] == '' or store['versionCode'] == '':
-               return Response("Error", status.HTTP_201_CREATED) # do stuff
-         exist = AndroidPackage.objects.filter(package_name=store['name'], package_version_code=store['versionCode'])
-         if len(exist) > 0:
-               return Response("Error", status.HTTP_201_CREATED) # do stuff
-         print("Exist :", exist)
-         filename = str(uuid.uuid4()) + '.apk'
-         path = os.path.join(settings.MEDIA_ROOT, filename)
-         print("PATH :", path)
+            default_storage.delete(tmp_path)
+            return Response("Error: Wrong file extention only send apk file", status.HTTP_415_UNSUPPORTED_MEDIA_TYPE) # do stuff
+         store = decode_uploaded_file(tmp_path)
+         if not store:
+            default_storage.delete(tmp_path)
+            return Response("Error: Erroned file", status.HTTP_422_UNPROCESSABLE_ENTITY) # do stuff
+         if package_already_exist(store[package_name], store[package_version_code]):
+            default_storage.delete(tmp_path)
+            return Response("Error: file already exist in the database", status.HTTP_409_CONFLICT) # do stuff
+         fileName = str(uuid.uuid4()) + '.apk'
+         path = os.path.join(settings.MEDIA_ROOT, fileName)
          os.rename(tmp_path, path)
-         AndroidPackage.objects.create(application="media/" + filename, package_name=store['name'], package_version_code=store['versionCode'])
-         return Response("fileName", status.HTTP_201_CREATED)
+         AndroidPackage.objects.create(application="media/" + fileName, package_name=store[package_name], package_version_code=store[package_version_code])
+         return Response("Save package " + store[package_name] + " in database", status.HTTP_201_CREATED)
+      else:
+         return Response("Error: Invalid form", status.HTTP_400_BAD_REQUEST) # do stuff
    elif request.method == 'GET':
-      print("YOOOO")
       app = AndroidPackage.objects.all()
-      print("APP", app)
       serializer = AndroidPkgSerializer(app, many=True)
-      print(serializer)
-      return Response(serializer.data)
+      return Response(serializer.data, status.HTTP_200_OK)
