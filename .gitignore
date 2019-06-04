@@ -123,3 +123,7 @@ dmypy.json
 
 # Pyre type checker
 .pyre/
+
+# Database
+rest-api-django/project/db.sqlite3
+rest-api-django/project/media
