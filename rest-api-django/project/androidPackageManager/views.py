@@ -53,6 +53,7 @@ def package_already_exist(package_name, package_version_code):
 
 @api_view(['GET', 'POST'])
 def model_form_upload(request):
+   print(request.method)
    if request.method == 'POST':
       if request.FILES and post_req_attr in request.FILES:
          my_file = request.FILES[post_req_attr]
